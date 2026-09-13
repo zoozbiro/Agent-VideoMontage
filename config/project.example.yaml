@@ -4,13 +4,20 @@ project:
 
 storage:
   input: /mnt/video/01_RUSHS
-  work: /opt/video-agent/work
+  work: /mnt/video/02_WORK
   output: /mnt/video/03_EXPORT
 
 processing:
   keep_originals: true
   use_proxies: true
   proxy_height: 720
+  test_duration: 30
+
+source:
+  file: /mnt/video/01_RUSHS/X5/2026-09-13/VID_20260911_103908_00_001.insv
 
 output:
   default_preset: reel-vertical
+  duration: 15
+  width: 1080
+  height: 1920
