@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Generated video-agent data
+inventory.json
+/mnt/video/
+
+# Local work/export artifacts
+*.proxy.mp4
+*.tmp
+*.part
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
