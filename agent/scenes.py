@@ -11,11 +11,11 @@ import subprocess
 from pathlib import Path
 
 DEFAULT_OUTPUT = Path("/mnt/video/02_WORK/scenes.json")
-DEFAULT_THRESHOLD = 0.35
+DEFAULT_THRESHOLD = 0.18
 
 
 def detect_scenes(source: Path, threshold: float) -> list[dict]:
-    filter_expr = f"select='gt(scene,{threshold})',metadata=print:file=-"
+    filter_expr = f"select='gt(scene,{threshold})',showinfo"
     cmd = [
         "ffmpeg", "-hide_banner", "-i", str(source),
         "-vf", filter_expr,
@@ -24,19 +24,17 @@ def detect_scenes(source: Path, threshold: float) -> list[dict]:
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     scenes = []
     for line in result.stderr.splitlines():
-        if "lavfi.scene_score=" not in line:
+        if "pts_time:" not in line or "Parsed_showinfo" not in line:
             continue
         try:
-            timestamp = None
-            score = None
-            for part in line.split():
-                if part.startswith("pts_time:"):
-                    timestamp = float(part.split(":", 1)[1])
-                elif part.startswith("lavfi.scene_score="):
-                    score = float(part.split("=", 1)[1])
-            if timestamp is not None and score is not None:
-                scenes.append({"time": round(timestamp, 3), "score": round(score, 4)})
-        except ValueError:
+            parts = dict(
+                part.split(":", 1)
+                for part in line.split()
+                if ":" in part
+            )
+            timestamp = float(parts["pts_time"])
+            scenes.append({"time": round(timestamp, 3)})
+        except (KeyError, ValueError):
             continue
     return scenes
 
@@ -58,9 +56,10 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Scènes candidates : {len(scenes)}")
+    print(f"Seuil             : {args.threshold}")
     print(f"Résultat          : {args.output}")
-    for scene in scenes[:20]:
-        print(f"  {scene['time']:8.3f}s  score={scene['score']:.4f}")
+    for scene in scenes[:30]:
+        print(f"  {scene['time']:8.3f}s")
 
 
 if __name__ == "__main__":
