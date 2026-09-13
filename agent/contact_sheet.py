@@ -27,10 +27,11 @@ def make_sheet(frames: list[Path], output: Path, columns: int) -> None:
     for frame in frames:
         inputs.extend(["-i", str(frame)])
     layout = f"tile={columns}x"
+    filter_complex = f"{layout[:-1]}{len(frames)//columns + (1 if len(frames) % columns else 0)}"
     cmd = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         *inputs,
-        "-filter_complex", layout,
+        "-filter_complex", filter_complex,
         "-frames:v", "1", "-q:v", "3", str(output),
     ]
     subprocess.run(cmd, check=True)
