@@ -34,6 +34,10 @@ def probe(path: Path) -> dict:
     }
 
 
+def is_media_file(path: Path) -> bool:
+    return path.is_file() and "@eaDir" not in path.parts
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Analyze proxy videos")
     parser.add_argument("--proxy-root", type=Path, default=DEFAULT_PROXY_ROOT)
@@ -41,7 +45,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=0, help="Analyze at most N files (0 = all)")
     args = parser.parse_args()
 
-    files = sorted(args.proxy_root.rglob("*.mp4"))
+    files = sorted(path for path in args.proxy_root.rglob("*.mp4") if is_media_file(path))
     if args.limit > 0:
         files = files[:args.limit]
 
