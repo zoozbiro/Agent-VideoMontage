@@ -3,11 +3,10 @@
 # Insta360 Video Agent - Proxmox LXC Creator
 # Proxmox VE 9.x / Debian 13
 #
-# Creates a dedicated LXC for the future video editing agent.
-# Lets you choose rootfs storage, template storage, CPU/RAM,
-# network, Intel iGPU and an optional bind mount from the host.
-#
-# This script does not delete or modify existing CTs.
+# Interactive creator inspired by Proxmox Community Scripts.
+# Creates a dedicated unprivileged LXC and optionally passes
+# through Intel renderD128 and an already-mounted NAS directory.
+# This script never modifies or deletes existing CTs.
 # ============================================================
 set -Eeuo pipefail
 
@@ -27,9 +26,7 @@ warn(){ echo -e "${YELLOW}ATTENTION:${NC} $*"; }
 
 require_root(){
   [[ $EUID -eq 0 ]] || die "Lancez ce script depuis le shell Proxmox en root."
-  command -v pct >/dev/null || die "Commande pct introuvable."
-  command -v pvesm >/dev/null || die "Commande pvesm introuvable."
-  command -v pvesh >/dev/null || die "Commande pvesh introuvable."
+  for cmd in pct pvesm pvesh pveam; do command -v "$cmd" >/dev/null || die "Commande $cmd introuvable."; done
 }
 
 get_next_id(){
@@ -65,7 +62,7 @@ choose_root_storage(){
 
 choose_template_storage(){
   mapfile -t STORAGES < <(pvesm status --content vztmpl 2>/dev/null | awk 'NR>1 && $1!="" && $3=="active" {print $1}')
-  ((${#STORAGES[@]})) || die "Aucun stockage actif compatible avec les templates vztmpl."
+  ((${#STORAGES[@]})) || die "Aucun stockage actif avec contenu vztmpl."
   echo; echo "=== Stockage du template Debian ==="; pvesm status --content vztmpl 2>/dev/null || true; echo
   local i=1; for s in "${STORAGES[@]}"; do echo "  $i) $s"; ((i++)); done
   while :; do
@@ -78,8 +75,8 @@ choose_template_storage(){
 
 get_debian_template(){
   info "Recherche du dernier template Debian 13 amd64..."
-  mapfile -t TEMPLATES < <(pveam available --section system 2>/dev/null | awk '$2 ~ /^debian-13-standard_.*_amd64\.tar\.[gx]z$/ {print $2}' | sort -V)
-  ((${#TEMPLATES[@]})) || die "Aucun template Debian 13 trouvé via pveam."
+  mapfile -t TEMPLATES < <(pveam available --section system 2>/dev/null | awk '$2 ~ /^debian-13-standard_.*_amd64\.tar\.(gz|xz|zst)$/ {print $2}' | sort -V)
+  ((${#TEMPLATES[@]})) || die "Aucun template Debian 13 amd64 trouvé via pveam."
   TEMPLATE_NAME="${TEMPLATES[-1]}"
   TEMPLATE_PATH="${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE_NAME}"
   if pveam list "$TEMPLATE_STORAGE" 2>/dev/null | grep -Fq "$TEMPLATE_NAME"; then
@@ -139,22 +136,19 @@ ask_igpu(){
 ask_bind_mount(){
   BIND_ENABLED=0; BIND_HOST=""; BIND_CT=""
   echo; echo "=== Dossier NAS optionnel ==="
-  echo "Si ton Synology est déjà monté sur l'hôte Proxmox, il peut être exposé au LXC."
+  echo "Le chemin doit déjà être monté sur l'hôte Proxmox (NFS/SMB/etc.)."
   read -r -p "Chemin hôte à monter (vide = aucun) : " BIND_HOST
   [[ -z $BIND_HOST ]] && return
   [[ -d $BIND_HOST ]] || die "Le chemin n'existe pas : $BIND_HOST"
-  case "$BIND_HOST" in /|/etc|/usr|/var|/bin|/sbin|/lib|/lib64|/boot|/proc|/sys|/dev) die "Chemin refusé.";; esac
+  case "$BIND_HOST" in /|/etc|/usr|/var|/bin|/sbin|/lib|/lib64|/boot|/proc|/sys|/dev) die "Chemin système refusé.";; esac
   read -r -p "Chemin dans le LXC [/mnt/video] : " BIND_CT; BIND_CT="${BIND_CT:-/mnt/video}"
   BIND_ENABLED=1
 }
 
 show_summary(){
-  echo; echo "============================================================"
-  echo " RÉSUMÉ"; echo "============================================================"
-  echo " CT ID          : $CTID"; echo " Hostname       : $HOSTNAME"
-  echo " Rootfs storage : $ROOT_STORAGE"; echo " Rootfs size    : ${DISK}G"
-  echo " Template       : $TEMPLATE_STORAGE"; echo " CPU            : $CORES cores"
-  echo " RAM            : ${RAM} MiB"; echo " SWAP           : ${SWAP} MiB"
+  echo; echo "============================================================"; echo " RÉSUMÉ"; echo "============================================================"
+  echo " CT ID          : $CTID"; echo " Hostname       : $HOSTNAME"; echo " Rootfs storage : $ROOT_STORAGE"; echo " Rootfs size    : ${DISK}G"
+  echo " Template       : $TEMPLATE_STORAGE"; echo " CPU            : $CORES cores"; echo " RAM            : ${RAM} MiB"; echo " SWAP           : ${SWAP} MiB"
   echo " Réseau         : $NET_CONFIG"; echo " iGPU Intel     : $([[ $IGPU_ENABLED == 1 ]] && echo OUI || echo NON)"
   [[ $BIND_ENABLED == 1 ]] && { echo " Bind host      : $BIND_HOST"; echo " Bind LXC       : $BIND_CT"; } || echo " Bind NAS       : NON"
   echo "============================================================"; echo
@@ -199,8 +193,7 @@ main(){
   [[ $PREPARE =~ ^[OoYy]$ ]] && prepare_container
   local ip="$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || true)"
   echo; echo "============================================================"; echo -e "${GREEN} LXC VIDEO AGENT PRÊT ${NC}"; echo "============================================================"
-  echo "CT ID       : $CTID"; echo "Hostname    : $HOSTNAME"; echo "IP détectée : ${ip:-non détectée}"
-  echo "Console     : pct enter $CTID"; echo "Workspace   : /opt/video-agent"
+  echo "CT ID       : $CTID"; echo "Hostname    : $HOSTNAME"; echo "IP détectée : ${ip:-non détectée}"; echo "Console     : pct enter $CTID"; echo "Workspace   : /opt/video-agent"
   echo "============================================================"
 }
 
