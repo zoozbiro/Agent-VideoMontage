@@ -8,6 +8,8 @@ from pathlib import Path
 DEFAULT_SCENES = Path("/mnt/video/02_WORK/scenes.json")
 DEFAULT_OUTPUT = Path("/mnt/video/02_WORK/scene-contact-sheet.jpg")
 DEFAULT_WORK = Path("/mnt/video/02_WORK/scene-frames")
+TILE_WIDTH = 320
+TILE_HEIGHT = 180
 
 
 def make_frame(source: Path, timestamp: float, output: Path) -> None:
@@ -15,7 +17,7 @@ def make_frame(source: Path, timestamp: float, output: Path) -> None:
     cmd = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-ss", str(timestamp), "-i", str(source),
-        "-frames:v", "1", "-vf", "scale=320:180",
+        "-frames:v", "1", "-vf", f"scale={TILE_WIDTH}:{TILE_HEIGHT}",
         "-q:v", "3", str(output),
     ]
     subprocess.run(cmd, check=True)
@@ -26,8 +28,19 @@ def make_sheet(frames: list[Path], output: Path, columns: int) -> None:
     inputs = []
     for frame in frames:
         inputs.extend(["-i", str(frame)])
+
     rows = (len(frames) + columns - 1) // columns
-    filter_complex = f"tile={columns}x{rows}"
+    layouts = []
+    for index in range(len(frames)):
+        x = (index % columns) * TILE_WIDTH
+        y = (index // columns) * TILE_HEIGHT
+        layouts.append(f"{x}_{y}")
+
+    labels = "".join(f"[{index}:v]" for index in range(len(frames)))
+    filter_complex = (
+        f"{labels}xstack=inputs={len(frames)}:layout={'|'.join(layouts)}:fill=black"
+    )
+
     cmd = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         *inputs,
