@@ -1,0 +1,9 @@
+name: reel-vertical
+container: mp4
+video_codec: h264
+width: 1080
+height: 1920
+fps: 30
+pixel_format: yuv420p
+audio_codec: aac
+audio_bitrate: 192k
