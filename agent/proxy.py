@@ -18,7 +18,7 @@ def make_proxy(source: Path, output: Path, force: bool = False) -> str:
         return "skipped"
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    temp = output.with_suffix(output.suffix + ".part")
+    temp = output.with_name(output.stem + ".part.mp4")
     if temp.exists():
         temp.unlink()
 
