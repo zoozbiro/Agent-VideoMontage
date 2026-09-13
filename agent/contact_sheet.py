@@ -26,8 +26,8 @@ def make_sheet(frames: list[Path], output: Path, columns: int) -> None:
     inputs = []
     for frame in frames:
         inputs.extend(["-i", str(frame)])
-    layout = f"tile={columns}x"
-    filter_complex = f"{layout[:-1]}{len(frames)//columns + (1 if len(frames) % columns else 0)}"
+    rows = (len(frames) + columns - 1) // columns
+    filter_complex = f"tile={columns}x{rows}"
     cmd = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         *inputs,
