@@ -1,0 +1,16 @@
+project:
+  name: Agent-VideoMontage
+  timezone: Europe/Paris
+
+storage:
+  input: /mnt/video/01_RUSHS
+  work: /opt/video-agent/work
+  output: /mnt/video/03_EXPORT
+
+processing:
+  keep_originals: true
+  use_proxies: true
+  proxy_height: 720
+
+output:
+  default_preset: reel-vertical
