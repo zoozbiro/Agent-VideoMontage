@@ -1,0 +1,20 @@
+project:
+  name: insta360-reel
+  target_duration_s: 30
+  output_aspect: "9:16"
+
+paths:
+  input: /mnt/video/01_RUSHS
+  work: /opt/video-agent/work
+  output: /mnt/video/03_EXPORT
+
+analysis:
+  proxy_height: 720
+  scene_detection: true
+  motion_score: true
+  audio_score: true
+
+style:
+  prefer_motion: true
+  max_clip_duration_s: 5
+  min_clip_duration_s: 1
