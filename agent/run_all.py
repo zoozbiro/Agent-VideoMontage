@@ -17,6 +17,11 @@ def run_step(name: str, command: list[str]) -> None:
     subprocess.run(command, cwd=REPO_ROOT, check=True)
 
 
+def is_media_file(path: Path) -> bool:
+    """Return True for real proxy files, excluding Synology metadata trees."""
+    return path.is_file() and "@eaDir" not in path.parts
+
+
 def main() -> int:
     python = sys.executable
     source = Path("/mnt/video/01_RUSHS")
@@ -33,7 +38,11 @@ def main() -> int:
     # Scene detection is intentionally run on every generated proxy. This is
     # a lightweight diagnostic stage; it does not claim to perform 360-aware
     # reframing or highlight selection.
-    proxy_files = sorted(PROXY_ROOT.rglob("*.mp4")) if PROXY_ROOT.exists() else []
+    proxy_files = (
+        sorted(path for path in PROXY_ROOT.rglob("*.mp4") if is_media_file(path))
+        if PROXY_ROOT.exists()
+        else []
+    )
     if not proxy_files:
         print("\nAucun proxy trouvé après la génération.")
         return 1
