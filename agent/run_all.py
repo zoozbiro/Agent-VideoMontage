@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the current video-agent pipeline end-to-end for one selected folder."""
+"""Run the video-agent pipeline end-to-end for one selected folder."""
 import json
 import subprocess
 import sys
@@ -20,7 +20,6 @@ def run_step(name: str, command: list[str]) -> None:
 
 
 def is_media_file(path: Path) -> bool:
-    """Return True for real proxy files, excluding Synology metadata trees."""
     return path.is_file() and "@eaDir" not in path.parts
 
 
@@ -33,18 +32,14 @@ def load_inventory() -> dict:
 def main() -> int:
     python = sys.executable
 
-    # scan.py asks the user which camera folder and date folder to process.
     run_step("1/5 — Sélection et inventaire des rushs", [python, str(AGENT_DIR / "scan.py")])
     inventory = load_inventory()
     source_dir = Path(inventory["source"])
     entries = [item for item in inventory.get("files", []) if item.get("status") == "new"]
-
     if not entries:
         print("\nAucune vidéo exploitable dans le dossier sélectionné.")
         return 1
 
-    # proxy.py consumes the inventory produced by scan.py, so it processes only
-    # the selected camera/date folder rather than the whole NAS library.
     run_step("2/5 — Génération des proxies", [python, str(AGENT_DIR / "proxy.py")])
 
     selected_proxies = []
@@ -53,15 +48,13 @@ def main() -> int:
         proxy = PROXY_ROOT / relative.with_suffix(".mp4")
         if is_media_file(proxy):
             selected_proxies.append(proxy)
-
     if not selected_proxies:
         print("\nAucun proxy trouvé pour le dossier sélectionné.")
         return 1
 
-    # Analyze only the proxies belonging to the selected camera/date.
     run_step(
         "3/5 — Analyse technique des proxies",
-        [python, str(AGENT_DIR / "analyze.py"), "--proxy-root", str(PROXY_ROOT / source_dir.name)],
+        [python, str(AGENT_DIR / "analyze.py"), "--proxy-root", str(PROXY_ROOT)],
     )
 
     scenes_dir = Path("/mnt/video/02_WORK/scenes") / inventory.get("camera", source_dir.parent.name) / inventory.get("date", source_dir.name)
@@ -72,15 +65,19 @@ def main() -> int:
             [python, str(AGENT_DIR / "scenes.py"), str(proxy), "--output", str(output)],
         )
 
-    # The current Reel prototype is intentionally single-source. Use the first
-    # valid clip from the selected folder until the future highlight selector
-    # can assemble multiple clips automatically.
-    first_source = Path(entries[0]["file"])
     run_step(
-        "5/5 — Prototype Reel vertical",
-        [python, str(AGENT_DIR / "test_pipeline.py"), "--source", str(first_source)],
+        "5/5 — Montage automatique du Reel",
+        [
+            python,
+            str(AGENT_DIR / "reel.py"),
+            "--inventory", str(INVENTORY),
+            "--duration", "30",
+        ],
     )
 
+    camera = inventory.get("camera", source_dir.parent.name)
+    date = inventory.get("date", source_dir.name)
+    final = Path("/mnt/video/03_EXPORT") / camera / date / "reel-001.mp4"
     print("\n" + "=" * 72)
     print("PIPELINE TERMINÉ")
     print("=" * 72)
@@ -88,8 +85,8 @@ def main() -> int:
     print(f"Vidéos traitées     : {len(selected_proxies)}")
     print(f"Proxies             : {PROXY_ROOT}")
     print(f"Scènes              : {scenes_dir}")
-    print("Prototype            : /mnt/video/03_EXPORT/test-project/prototype-reel.mp4")
-    print("\nNote : le pipeline actuel ne fait pas encore le stitching 360 X5 ni le reframing 360 automatique.")
+    print(f"Reel final          : {final}")
+    print("\nNote : le montage v1 est automatique, mais le X5 n'a pas encore de vrai reframing 360.")
     return 0
 
 
